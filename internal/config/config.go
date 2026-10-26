@@ -31,6 +31,47 @@ type SyncSettings struct {
 	PushToAnkiWeb bool `toml:"push_to_anki_web"`
 }
 
+// PrioritySettings files notes into one flat deck per priority tier instead of
+// a deck per folder. The folder hierarchy is kept as hierarchical tags.
+type PrioritySettings struct {
+	// Decks lists the deck for each tier, highest priority first. Priority
+	// placement is off when it is empty.
+	Decks []string `toml:"decks"`
+	// Default is the 1-based tier for notes no folder rule or frontmatter
+	// `priority` covers.
+	Default int `toml:"default"`
+	// Folders maps a folder path relative to the synced directory, such as
+	// "Math" or "Eng/Words", to a tier. The longest matching folder wins.
+	Folders map[string]int `toml:"folders"`
+	// TagPrefix prefixes the folder tag, e.g. "topic" gives
+	// "topic::Math::4-Stat". Notes directly in the root get no folder tag.
+	TagPrefix string `toml:"tag_prefix"`
+}
+
+// Enabled reports whether notes are placed by priority.
+func (p PrioritySettings) Enabled() bool {
+	return len(p.Decks) > 0
+}
+
+// validate checks that every tier refers to a configured deck.
+func (p PrioritySettings) validate() error {
+	if !p.Enabled() {
+		return nil
+	}
+
+	if p.Default < 1 || p.Default > len(p.Decks) {
+		return fmt.Errorf("priority.default must be between 1 and %d", len(p.Decks))
+	}
+
+	for folder, tier := range p.Folders {
+		if tier < 1 || tier > len(p.Decks) {
+			return fmt.Errorf("priority.folders.%q must be between 1 and %d", folder, len(p.Decks))
+		}
+	}
+
+	return nil
+}
+
 // Settings is the full resolved configuration.
 type Settings struct {
 	AnkiConnect       AnkiConnectSettings `toml:"anki_connect"`
@@ -39,6 +80,7 @@ type Settings struct {
 	Namespace         string              `toml:"namespace"`
 	StrictLineBreaks  bool                `toml:"strict_line_breaks"`
 	Sync              SyncSettings        `toml:"sync"`
+	Priority          PrioritySettings    `toml:"priority"`
 }
 
 // Defaults returns the built-in settings.
@@ -99,6 +141,10 @@ func Load(directory, explicitPath string) (Settings, string, error) {
 		}
 
 		return Settings{}, "", fmt.Errorf("unknown config keys in %s: %s", path, strings.Join(keys, ", "))
+	}
+
+	if err := settings.Priority.validate(); err != nil {
+		return Settings{}, "", fmt.Errorf("config %s: %w", path, err)
 	}
 
 	return settings, path, nil

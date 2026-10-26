@@ -14,7 +14,9 @@ type Frontmatter struct {
 	DeckName string
 	// NoteID is the Anki note ID recorded in the frontmatter, or 0 when absent.
 	NoteID int64
-	Tags   []string
+	// Priority is the 1-based priority tier, or 0 when absent.
+	Priority int
+	Tags     []string
 }
 
 var noteIDLineRegex = regexp.MustCompile(`^noteId\s*:\s*(-?\d+)?\s*$`)
@@ -101,6 +103,10 @@ func ParseFrontmatter(markdown string) (Frontmatter, error) {
 		if parsed, err := strconv.ParseInt(noteID, 10, 64); err == nil {
 			frontmatter.NoteID = parsed
 		}
+	}
+
+	if priority, ok := decoded["priority"].(int); ok {
+		frontmatter.Priority = priority
 	}
 
 	frontmatter.Tags = coerceTags(decoded["tags"])

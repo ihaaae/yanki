@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ihaaae/yanki/internal/anki"
+	"github.com/ihaaae/yanki/internal/config"
 	"github.com/ihaaae/yanki/internal/markdown"
 	"github.com/ihaaae/yanki/internal/note"
 	"github.com/ihaaae/yanki/internal/vault"
@@ -21,6 +25,12 @@ type FileOptions struct {
 	CheckDatabase    bool
 	PushToAnkiWeb    bool
 	StrictMatching   bool
+	// Root is the synced directory. Priority placement needs it to compute
+	// folder paths.
+	Root string
+	// Priority, when enabled, replaces folder-derived decks with one deck per
+	// priority tier plus a folder tag.
+	Priority config.PrioritySettings
 }
 
 // SyncedFile pairs a sync action with the file it came from. Deleted notes
@@ -70,6 +80,21 @@ func Files(ctx context.Context, client *anki.Client, filePaths []string, options
 		})
 		if err != nil {
 			return FilesResult{}, fmt.Errorf("parse %s: %w", filePath, err)
+		}
+
+		if options.Priority.Enabled() {
+			deckName, tag, err := placeByPriority(options.Root, filePath, string(contents), options.Priority)
+			if err != nil {
+				return FilesResult{}, fmt.Errorf("%s: %w", filePath, err)
+			}
+
+			if parsed.DeckName == "" {
+				parsed.DeckName = deckName
+			}
+
+			if tag != "" && !slices.Contains(parsed.Tags, tag) {
+				parsed.Tags = append(parsed.Tags, tag)
+			}
 		}
 
 		if parsed.DeckName == "" && index < len(deckNames) {
@@ -144,4 +169,50 @@ func Files(ctx context.Context, client *anki.Client, filePaths []string, options
 		ReuploadedMedia: result.ReuploadedMedia,
 		Synced:          syncedFiles,
 	}, nil
+}
+
+// placeByPriority returns the deck for a note's priority tier and the tag that
+// records its folder. The tier comes from the frontmatter `priority`, else the
+// longest configured folder containing the note, else the default.
+func placeByPriority(root, filePath, contents string, priority config.PrioritySettings) (string, string, error) {
+	frontmatter, err := note.ParseFrontmatter(contents)
+	if err != nil {
+		return "", "", err
+	}
+
+	relative, err := filepath.Rel(root, filepath.Dir(filePath))
+	if err != nil {
+		return "", "", err
+	}
+
+	relative = filepath.ToSlash(relative)
+
+	tier := frontmatter.Priority
+	if tier == 0 {
+		tier = priority.Default
+		longest := -1
+		for folder, folderTier := range priority.Folders {
+			folder = strings.Trim(folder, "/")
+			if (relative == folder || strings.HasPrefix(relative, folder+"/")) && len(folder) > longest {
+				tier, longest = folderTier, len(folder)
+			}
+		}
+	}
+
+	if tier < 1 || tier > len(priority.Decks) {
+		return "", "", fmt.Errorf("priority %d is not between 1 and %d", tier, len(priority.Decks))
+	}
+
+	tag := ""
+	if relative != "." {
+		// Anki tags cannot contain spaces.
+		segments := strings.Split(strings.ReplaceAll(relative, " ", "_"), "/")
+		if priority.TagPrefix != "" {
+			segments = append([]string{priority.TagPrefix}, segments...)
+		}
+
+		tag = strings.Join(segments, "::")
+	}
+
+	return priority.Decks[tier-1], tag, nil
 }

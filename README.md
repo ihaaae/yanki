@@ -138,6 +138,31 @@ hierarchy:
 
 A `deckName` key in a note's frontmatter overrides the inferred deck.
 
+### Priority decks
+
+With a `[priority]` table in `yanki.toml`, Yanki files each note into one flat
+deck per priority tier instead of a deck per folder, and records the folder as a
+hierarchical tag:
+
+```toml
+[priority]
+decks = ["A::P1", "A::P2", "A::P3"] # highest priority first
+default = 2                         # tier for notes no rule covers
+tag_prefix = "topic"
+
+[priority.folders]                  # longest matching folder wins
+"Math" = 1
+"Eng" = 1
+"Bayes" = 3
+```
+
+```text
+Math/4-Stat/z-score.md → deck A::P1, tag topic::Math::4-Stat
+```
+
+A `priority: N` key in a note's frontmatter overrides the folder rules, and
+`deckName` still overrides both. Spaces in folder names become `_` in tags.
+
 ## Math
 
 `$inline$` and `$$display$$` math become Anki's MathJax `\(inline\)` and
@@ -155,6 +180,7 @@ noteId: 1234567890 # managed by Yanki; do not edit by hand
 tags:
   - parent/child # `/` becomes Anki's `::` tag hierarchy
 deckName: Custom Deck # optional
+priority: 1 # optional, see Priority decks
 ---
 ```
 

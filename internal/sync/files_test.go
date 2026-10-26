@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ihaaae/yanki/internal/config"
 	"github.com/ihaaae/yanki/internal/vault"
 )
 
@@ -174,4 +175,75 @@ func countActionInFiles(result FilesResult, action Action) int {
 	}
 
 	return count
+}
+
+func TestFilesPlacesNotesByPriority(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeAnki()
+	_, client := fake.server(t)
+
+	root := t.TempDir()
+	copyTree(t, filepath.Join("..", "..", "testdata", "vault"), root)
+
+	// Frontmatter overrides the folder rule for this one note.
+	horse := filepath.Join(root, "Anki", "Animals", "Quadruped", "Horse.md")
+	contents, err := os.ReadFile(horse)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(horse, append([]byte("---\npriority: 3\n---\n"), contents...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	directory, err := vault.Resolve(root)
+	if err != nil {
+		t.Fatalf("resolve vault: %v", err)
+	}
+
+	options := FileOptions{
+		Namespace:        "Test",
+		StrictLineBreaks: true,
+		Root:             directory.RootPath,
+		Priority: config.PrioritySettings{
+			Decks:     []string{"A::P1", "A::P2", "A::P3"},
+			Default:   2,
+			Folders:   map[string]int{"Anki": 3, "Anki/Animals": 1},
+			TagPrefix: "topic",
+		},
+	}
+
+	if _, err := Files(t.Context(), client, directory.FindNotePaths(nil, true), options); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	type placement struct {
+		deck string
+		tags string
+	}
+
+	got := map[string]placement{}
+	for _, stored := range fake.notes {
+		got[stored.fields["Front"]] = placement{stored.deck, strings.Join(stored.tags, " ")}
+	}
+
+	want := map[string]placement{
+		"Plato":   {"A::P1", "topic::Anki::Animals::Biped"},     // longest folder rule wins
+		"Horse":   {"A::P3", "topic::Anki::Animals::Quadruped"}, // frontmatter beats folder
+		"Rock":    {"A::P3", "topic::Anki::Non-living_things"},  // spaces are not allowed in tags
+		"Outside": {"A::P2", ""},                                // root notes: default tier, no tag
+	}
+
+	for front, placed := range got {
+		for word, expected := range want {
+			if strings.Contains(front, word) && placed != expected {
+				t.Errorf("note containing %q placed as %+v, want %+v", word, placed, expected)
+			}
+		}
+	}
+
+	if len(got) != 5 {
+		t.Errorf("synced %d notes, want 5", len(got))
+	}
 }

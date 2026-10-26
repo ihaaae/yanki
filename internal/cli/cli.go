@@ -240,6 +240,8 @@ func runSync(command *cobra.Command, args []string, values *flags) error {
 		Namespace:        state.namespace,
 		PushToAnkiWeb:    state.settings.Sync.PushToAnkiWeb,
 		StrictLineBreaks: state.settings.StrictLineBreaks,
+		Root:             state.directory.RootPath,
+		Priority:         state.settings.Priority,
 	})
 	if err != nil {
 		return err
