@@ -20,6 +20,9 @@ type Options struct {
 	// StrictLineBreaks treats single newlines as line breaks when true. It is
 	// accepted for API compatibility and currently always renders soft breaks.
 	StrictLineBreaks bool
+
+	// mathSpans holds the rendered math for each placeholder in the source.
+	mathSpans []string
 }
 
 // clozeNumberPrefixRegex matches a leading cloze number and any content after
@@ -43,7 +46,9 @@ func Parse(markdown string, opts Options) (note.Note, error) {
 
 	md := selectParser(opts.StrictLineBreaks)
 
-	source := []byte(note.StripFrontmatter(markdown))
+	protected, mathSpans := protectMath(note.StripFrontmatter(markdown))
+	opts.mathSpans = mathSpans
+	source := []byte(protected)
 	parsed := md.Parser().Parse(text.NewReader(source))
 
 	document, ok := parsed.(*ast.Document)

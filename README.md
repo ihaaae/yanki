@@ -138,6 +138,13 @@ hierarchy:
 
 A `deckName` key in a note's frontmatter overrides the inferred deck.
 
+## Math
+
+`$inline$` and `$$display$$` math become Anki's MathJax `\(inline\)` and
+`\[display\]`. Following Pandoc, an opening `$` must not be followed by a
+space and a closing `$` must not be preceded by a space or followed by a digit,
+so `$1 and $2` stays literal. Dollars in code are never math.
+
 ## Frontmatter
 
 Yanki reads a small amount of YAML frontmatter and writes one key back:
@@ -240,7 +247,7 @@ Not yet implemented (tracked for follow-up work):
 - Automatic note file renaming based on card content
 - Model style management (`getStyle` / `setStyle` equivalents)
 - Rich Markdown rendering: syntax highlighting, GitHub alerts, `==highlights==`,
-  furigana, math, and Obsidian-style wiki links
+  furigana, and Obsidian-style wiki links
 - Filtered-deck handling when reading notes back from Anki
 
 ## Development

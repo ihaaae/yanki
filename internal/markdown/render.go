@@ -56,6 +56,8 @@ func renderField(md goldmark.Markdown, nodes []ast.Node, source []byte, opts Opt
 		return "", err
 	}
 
+	rendered = restoreMath(rendered, opts.mathSpans)
+
 	empty := isVisuallyEmpty(rendered)
 	if empty && !useEmptyPlaceholder {
 		return "", nil

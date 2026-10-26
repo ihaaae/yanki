@@ -178,3 +178,19 @@ func TestFrontmatterTagsAndNoteID(t *testing.T) {
 		t.Errorf("frontmatter leaked into the front field:\n%s", parsed.Fields.Front)
 	}
 }
+
+func TestMathUsesAnkiDelimiters(t *testing.T) {
+	t.Parallel()
+
+	parsed := parse(t, "Inline $a_1 * b_2 < c$ and ~~$x^2$~~, the $y$**-axis**\n\n$$\n\\sum_i x_i\n$$\n\n---\n\nAWK prints `$1` and $1 and $2, costs $5 or \\$6")
+
+	for _, want := range []string{`\(a_1 * b_2 &lt; c\)`, `{{c1::\(x^2\)}}`, `\(y\)<strong>-axis</strong>`, `\[\sum_i x_i\]`} {
+		if !strings.Contains(parsed.Fields.Front, want) {
+			t.Errorf("front is missing %q:\n%s", want, parsed.Fields.Front)
+		}
+	}
+
+	if want := "<code>$1</code> and $1 and $2, costs $5 or $6"; !strings.Contains(parsed.Fields.Back, want) {
+		t.Errorf("back should keep dollars that are not math, want %q:\n%s", want, parsed.Fields.Back)
+	}
+}
