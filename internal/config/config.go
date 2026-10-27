@@ -46,6 +46,9 @@ type PrioritySettings struct {
 	// TagPrefix prefixes the folder tag, e.g. "topic" gives
 	// "topic::Math::4-Stat". Notes directly in the root get no folder tag.
 	TagPrefix string `toml:"tag_prefix"`
+	// FolderTags replaces the generated tag for a folder and its descendants.
+	// The longest matching folder wins; values are complete Anki tags.
+	FolderTags map[string]string `toml:"folder_tags"`
 }
 
 // Enabled reports whether notes are placed by priority.

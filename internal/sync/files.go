@@ -214,5 +214,13 @@ func placeByPriority(root, filePath, contents string, priority config.PrioritySe
 		tag = strings.Join(segments, "::")
 	}
 
+	longest := -1
+	for folder, folderTag := range priority.FolderTags {
+		folder = strings.Trim(folder, "/")
+		if (relative == folder || strings.HasPrefix(relative, folder+"/")) && len(folder) > longest {
+			tag, longest = folderTag, len(folder)
+		}
+	}
+
 	return priority.Decks[tier-1], tag, nil
 }

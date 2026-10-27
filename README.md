@@ -163,6 +163,19 @@ Math/4-Stat/z-score.md → deck A::P1, tag topic::Math::4-Stat
 A `priority: N` key in a note's frontmatter overrides the folder rules, and
 `deckName` still overrides both. Spaces in folder names become `_` in tags.
 
+To keep tags simpler than the directory tree, map folders to complete tags.
+The longest matching folder rule applies to that folder and its descendants,
+replacing the generated tag (including `tag_prefix`). Unmatched folders keep
+their generated tags; frontmatter tags are still included.
+
+```toml
+[priority.folder_tags]
+"Git" = "git"
+"Math" = "Math"
+"Math/0-Terms" = "Math::Terms"
+"Math/2-Calculus" = "Math::Calculus"
+```
+
 ## Math
 
 `$inline$` and `$$display$$` math become Anki's MathJax `\(inline\)` and

@@ -246,4 +246,47 @@ func TestFilesPlacesNotesByPriority(t *testing.T) {
 	if len(got) != 5 {
 		t.Errorf("synced %d notes, want 5", len(got))
 	}
+
+	// Changing folder tags updates existing notes without changing their decks
+	// or IDs. An ancestor rule applies to descendants, not similarly named siblings.
+	options.Priority.FolderTags = map[string]string{
+		"Anki/Animals":       "animals",
+		"Anki/Animals/Biped": "animals::biped",
+		"Anki/Non-living":    "wrong-sibling",
+	}
+	want["Plato"] = placement{"A::P1", "animals::biped"}
+	want["Horse"] = placement{"A::P3", "animals"}
+	ids := map[int64]bool{}
+	for id := range fake.notes {
+		ids[id] = true
+	}
+
+	updated, err := Files(t.Context(), client, directory.FindNotePaths(nil, true), options)
+	if err != nil {
+		t.Fatalf("update folder tags: %v", err)
+	}
+	if countActionInFiles(updated, ActionUpdated) != 3 || len(fake.notes) != len(ids) {
+		t.Fatalf("expected three tag updates without adding or deleting notes: %+v", updated.Synced)
+	}
+	for id, stored := range fake.notes {
+		if !ids[id] {
+			t.Errorf("note ID changed to %d", id)
+		}
+		for word, expected := range want {
+			if strings.Contains(stored.fields["Front"], word) {
+				placed := placement{stored.deck, strings.Join(stored.tags, " ")}
+				if placed != expected {
+					t.Errorf("note containing %q placed as %+v, want %+v", word, placed, expected)
+				}
+			}
+		}
+	}
+
+	repeated, err := Files(t.Context(), client, directory.FindNotePaths(nil, true), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countActionInFiles(repeated, ActionUnchanged) != 5 {
+		t.Errorf("repeated sync should leave all notes unchanged: %+v", repeated.Synced)
+	}
 }
