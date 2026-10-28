@@ -40,6 +40,15 @@ const DefaultCSS = `.card {
 	color: black;
 	background-color: white;
 }
+
+` + tagsCSS
+
+// tagsCSS styles the tag header that every Yanki card face starts with.
+const tagsCSS = `.yanki-tags {
+	font-size: 0.6em;
+	color: gray;
+	margin-bottom: 0.5em;
+}
 `
 
 // DefaultDeckName is the deck used when a note's file path yields no deck.
@@ -57,12 +66,16 @@ const DefaultEmptyText = "(Empty)"
 // field, available for custom styling.
 const CSSDefaultClassName = "yanki"
 
+// tagsHeader shows the note's tags above every card face, so a terse card
+// such as an operator cloze still says which subject it belongs to.
+const tagsHeader = `<div class="yanki-tags">{{Tags}}</div>\n`
+
 // Models returns the createModel definitions for every model Yanki manages.
 func Models() []anki.Model {
 	return []anki.Model{
 		{
 			CardTemplates: []anki.CardTemplate{
-				{Qfmt: "{{Front}}", Afmt: "{{FrontSide}}\n\n<hr id=answer>\n\n{{Back}}"},
+				{Qfmt: tagsHeader + "{{Front}}", Afmt: "{{FrontSide}}\n\n<hr id=answer>\n\n{{Back}}"},
 			},
 			InOrderFields: []string{"Front", "Back", "YankiNamespace"},
 			CSS:           DefaultCSS,
@@ -70,7 +83,7 @@ func Models() []anki.Model {
 		},
 		{
 			CardTemplates: []anki.CardTemplate{
-				{Qfmt: "{{cloze:Front}}", Afmt: "{{cloze:Front}}<br>\n{{Back}}"},
+				{Qfmt: tagsHeader + "{{cloze:Front}}", Afmt: tagsHeader + "{{cloze:Front}}<br>\n{{Back}}"},
 			},
 			InOrderFields: []string{"Front", "Back", "YankiNamespace"},
 			IsCloze:       true,
@@ -79,7 +92,7 @@ func Models() []anki.Model {
 		},
 		{
 			CardTemplates: []anki.CardTemplate{
-				{Qfmt: "{{Front}}\n\n{{type:Back}}", Afmt: "{{Front}}\n\n<hr id=answer>\n\n{{type:Back}}"},
+				{Qfmt: tagsHeader + "{{Front}}\n\n{{type:Back}}", Afmt: tagsHeader + "{{Front}}\n\n<hr id=answer>\n\n{{type:Back}}"},
 			},
 			InOrderFields: []string{"Front", "Back", "YankiNamespace"},
 			CSS:           DefaultCSS,
@@ -88,11 +101,11 @@ func Models() []anki.Model {
 		{
 			CardTemplates: []anki.CardTemplate{
 				{
-					Qfmt: "{{Front}}",
+					Qfmt: tagsHeader + "{{Front}}",
 					Afmt: "{{FrontSide}}\n\n<hr id=answer>\n\n{{Back}}{{#Extra}}\n\n<hr>\n\n{{Extra}}{{/Extra}}",
 				},
 				{
-					Qfmt: "{{Back}}",
+					Qfmt: tagsHeader + "{{Back}}",
 					Afmt: "{{FrontSide}}\n\n<hr id=answer>\n\n{{Front}}{{#Extra}}\n\n<hr>\n\n{{Extra}}{{/Extra}}",
 				},
 			},
