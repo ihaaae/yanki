@@ -125,6 +125,21 @@ explicitly, which lets several deletions reveal together:
 ~~1 All~~ will be ~~1 revealed~~.
 ```
 
+Inside math and code, where Markdown strikethrough does not apply, a `~~` pair
+is still a cloze. This hides part of a formula or a line of code, numbered
+together with the other clozes:
+
+````md
+$\log_n(c^m) = ~~1 m~~ \log_n(~~1 c~~)$
+
+```sh
+time wc ch3.1 >wc.out ~~2>&1~~
+```
+````
+
+Hints are not supported inside math or code, and `~~` there is always a cloze
+on the front of a cloze note.
+
 ## Decks
 
 A note's deck comes from its location. The folder hierarchy relative to the

@@ -56,7 +56,7 @@ func Parse(markdown string, opts Options) (note.Note, error) {
 		return note.Note{}, errors.New("markdown parser did not return a document")
 	}
 
-	modelName := inferModel(document, source)
+	modelName := inferModel(document, source, mathSpans)
 
 	fields := note.Fields{YankiNamespace: namespace}
 
@@ -192,8 +192,8 @@ func splitAtThematicBreak(nodes []ast.Node) (before, after []ast.Node) {
 }
 
 // inferModel determines which Anki note type a document describes.
-func inferModel(document *ast.Document, source []byte) note.ModelName {
-	if clozeBeforeBreak(document, source) {
+func inferModel(document *ast.Document, source []byte, mathSpans []string) note.ModelName {
+	if clozeBeforeBreak(document, source, mathSpans) {
 		return note.ModelCloze
 	}
 
@@ -224,9 +224,10 @@ func inferModel(document *ast.Document, source []byte) note.ModelName {
 	return probable
 }
 
-// clozeBeforeBreak reports whether a strikethrough appears before the first
-// thematic break, which is what marks a document as a cloze note.
-func clozeBeforeBreak(document *ast.Document, source []byte) bool {
+// clozeBeforeBreak reports whether a cloze appears before the first thematic
+// break, which is what marks a document as a cloze note. A cloze is either a
+// strikethrough or a `~~` pair inside math or code.
+func clozeBeforeBreak(document *ast.Document, source []byte, mathSpans []string) bool {
 	for child := document.FirstChild(); child != nil; child = child.NextSibling() {
 		if child.Kind() == ast.KindThematicBreak {
 			return false
@@ -234,7 +235,7 @@ func clozeBeforeBreak(document *ast.Document, source []byte) bool {
 
 		found := false
 		_ = ast.Walk(child, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
-			if entering && node.Kind() == extast.KindStrikethrough {
+			if entering && (node.Kind() == extast.KindStrikethrough || hasInnerCloze(node, source, mathSpans)) {
 				found = true
 				return ast.WalkStop, nil
 			}
@@ -369,16 +370,13 @@ func clozeify(nodes []ast.Node, source []byte) {
 		})
 	}
 
-	clozeIndex := 1
-
 	for _, strikethrough := range strikethroughs {
 		parent := strikethrough.Parent()
 		if parent == nil || !strikethrough.HasChildren() {
 			continue
 		}
 
-		replacements, nextIndex := buildCloze(strikethrough, clozeIndex, source)
-		clozeIndex = nextIndex
+		replacements := buildCloze(strikethrough, source)
 
 		if len(replacements) == 0 {
 			continue
@@ -394,9 +392,11 @@ func clozeify(nodes []ast.Node, source []byte) {
 }
 
 // buildCloze converts one strikethrough node into the sequence of nodes that
-// render as `{{cN::content::hint}}`, returning the next implicit cloze index.
-func buildCloze(strikethrough *extast.Strikethrough, clozeIndex int, source []byte) ([]ast.Node, int) {
+// render as `{{cN::content::hint}}`. Without an explicit number it leaves an
+// implicit-number marker for numberClozes.
+func buildCloze(strikethrough *extast.Strikethrough, source []byte) []ast.Node {
 	children := childNodes(strikethrough)
+	label := implicitClozeNumber
 
 	// A leading one- or two-digit number overrides the implicit index, but only
 	// when there is other content to cloze.
@@ -406,7 +406,7 @@ func buildCloze(strikethrough *extast.Strikethrough, clozeIndex int, source []by
 				remainder := match[2]
 				if len(children) > 1 || strings.TrimSpace(remainder) != "" {
 					if parsed, err := strconv.Atoi(match[1]); err == nil {
-						clozeIndex = parsed
+						label = strconv.Itoa(parsed)
 						children = replaceFirstText(children, remainder)
 					}
 				}
@@ -423,7 +423,7 @@ func buildCloze(strikethrough *extast.Strikethrough, clozeIndex int, source []by
 		}
 	}
 
-	nodes := []ast.Node{ast.NewString([]byte("{{c" + strconv.Itoa(clozeIndex) + "::"))}
+	nodes := []ast.Node{ast.NewString([]byte("{{c" + label + "::"))}
 	nodes = append(nodes, trimEdges(content, source)...)
 
 	if len(hint) > 0 {
@@ -433,7 +433,7 @@ func buildCloze(strikethrough *extast.Strikethrough, clozeIndex int, source []by
 
 	nodes = append(nodes, ast.NewString([]byte("}}")))
 
-	return nodes, clozeIndex + 1
+	return nodes
 }
 
 // replaceFirstText swaps the first text node for a string node carrying new

@@ -186,8 +186,9 @@ func isSpace(character byte) bool {
 	return character == ' ' || character == '\t' || character == '\n' || character == '\r'
 }
 
-// restoreMath swaps placeholders in rendered HTML for Anki MathJax markup.
-func restoreMath(rendered string, spans []string) string {
+// restoreMath swaps placeholders in rendered HTML for Anki MathJax markup,
+// turning `~~text~~` inside the math into clozes when cloze is set.
+func restoreMath(rendered string, spans []string, cloze bool) string {
 	if len(spans) == 0 {
 		return rendered
 	}
@@ -196,6 +197,10 @@ func restoreMath(rendered string, spans []string) string {
 		index, err := strconv.Atoi(mathPlaceholderRegex.FindStringSubmatch(match)[1])
 		if err != nil || index >= len(spans) {
 			return match
+		}
+
+		if cloze {
+			return replaceInnerClozes(spans[index])
 		}
 
 		return spans[index]

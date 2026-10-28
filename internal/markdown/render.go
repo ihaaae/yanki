@@ -56,7 +56,17 @@ func renderField(md goldmark.Markdown, nodes []ast.Node, source []byte, opts Opt
 		return "", err
 	}
 
-	rendered = restoreMath(rendered, opts.mathSpans)
+	// Only a cloze note's front holds clozes; elsewhere `~~` stays literal.
+	cloze := model == note.ModelCloze && position == "front"
+	if cloze {
+		rendered = clozeCode(rendered)
+	}
+
+	rendered = restoreMath(rendered, opts.mathSpans, cloze)
+
+	if cloze {
+		rendered = numberClozes(rendered)
+	}
 
 	empty := isVisuallyEmpty(rendered)
 	if empty && !useEmptyPlaceholder {

@@ -194,3 +194,64 @@ func TestMathUsesAnkiDelimiters(t *testing.T) {
 		t.Errorf("back should keep dollars that are not math, want %q:\n%s", want, parsed.Fields.Back)
 	}
 }
+
+func TestClozesInsideMathAndCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		markdown string
+		front    []string
+		back     []string
+	}{
+		{
+			name:     "math alone makes a cloze note",
+			markdown: `$\log_n(c^m) = ~~1 m~~ \log_n(~~1 c~~)$`,
+			front:    []string{`\(\log_n(c^m) = {{c1::m}} \log_n({{c1::c}})\)`},
+		},
+		{
+			name:     "math, code, and strikethrough share numbering",
+			markdown: "~~a~~ $x = ~~5 b~~$ `y ~~c~~` ~~d~~",
+			front:    []string{"{{c1::a}}", `\(x = {{c5::b}}\)`, "<code>y {{c6::c}}</code>", "{{c7::d}}"},
+		},
+		{
+			name:     "braces and colons cannot end the cloze early",
+			markdown: "`print(f\"Debugging ~~{bugs=}~~\")` and `~~std::cout~~`",
+			front:    []string{"{{c1::&#123;bugs=&#125;}}", "{{c2::std&#58;&#58;cout}}"},
+		},
+		{
+			name:     "fenced code",
+			markdown: "```sh\ncase $1 in\n  ~~a)~~ echo a ;;\nesac\n```",
+			front:    []string{"  {{c1::a)}} echo a ;;"},
+		},
+		{
+			name:     "back keeps tildes literal",
+			markdown: "$~~x~~$\n\n---\n\n`~~y~~` $~~z~~$",
+			front:    []string{`\({{c1::x}}\)`},
+			back:     []string{"<code>~~y~~</code>", `\(~~z~~\)`},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			parsed := parse(t, test.markdown)
+			if parsed.ModelName != note.ModelCloze {
+				t.Fatalf("model = %q, want cloze", parsed.ModelName)
+			}
+
+			for _, want := range test.front {
+				if !strings.Contains(parsed.Fields.Front, want) {
+					t.Errorf("front is missing %q:\n%s", want, parsed.Fields.Front)
+				}
+			}
+
+			for _, want := range test.back {
+				if !strings.Contains(parsed.Fields.Back, want) {
+					t.Errorf("back is missing %q:\n%s", want, parsed.Fields.Back)
+				}
+			}
+		})
+	}
+}
